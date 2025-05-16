@@ -1,46 +1,40 @@
-from flask import Flask, request, render_template, send_file
-import yt_dlp
-import ffmpeg
 import os
+from flask import Flask, request, send_file
+import yt_dlp
 import uuid
 
 app = Flask(__name__)
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        youtube_url = request.form['url']
-        temp_id = str(uuid.uuid4())
-        video_file = f"{temp_id}.mp4"
-        output_file = f"{temp_id}.3gp"
+@app.route("/")
+def home():
+    return '''
+        <h2>YouTube to 3GP (176x144) Downloader</h2>
+        <form method="POST" action="/download">
+            YouTube URL: <input name="url" required><br><br>
+            <button type="submit">Download 3GP</button>
+        </form>
+    '''
 
-        try:
-            ydl_opts = {
-                'format': 'worst',
-                'outtmpl': video_file,
-                'quiet': True
-            }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([youtube_url])
+@app.route("/download", methods=["POST"])
+def download():
+    url = request.form["url"]
+    file_name = f"{uuid.uuid4()}.3gp"
 
-            ffmpeg.input(video_file).output(
-                output_file,
-                format='3gp',
-                vf='scale=176:144',
-                acodec='aac',
-                vcodec='mpeg4',
-                video_bitrate='100k',
-                audio_bitrate='32k'
-            ).overwrite_output().run()
+    ydl_opts = {
+        'format': '160',  # 3gp 176x144 (itag 160)
+        'outtmpl': file_name,
+        'quiet': True,
+        'proxy': 'http://103.231.80.146:55443',  # ✅ Free working HTTP proxy
+    }
 
-            os.remove(video_file)
-            return send_file(output_file, as_attachment=True)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+    except Exception as e:
+        return f"<b>Error:</b> {str(e)}"
 
-        except Exception as e:
-            return f"<h3>Error: {str(e)}</h3>"
-
-    return render_template("index.html")
+    return send_file(file_name, as_attachment=True)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
-
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    
